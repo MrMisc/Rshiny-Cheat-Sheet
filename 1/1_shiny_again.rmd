@@ -1,0 +1,158 @@
+---
+title: "The FoodCourt"
+output: 
+  html_document:
+    theme:
+      bg: "#202123"
+      fg: "#B8BCC2"
+      primary: "#EA80FC"
+      secondary: "#00DAC6"
+      base_font:
+        Yu Gothic
+      heading_font:
+        optimamodoki
+version: 5
+runtime: shiny
+---
+  
+  ```{r setup, include=FALSE}
+if (requireNamespace("thematic")) 
+  thematic::thematic_rmd(font = "auto")
+knitr::opts_chunk$set(
+  comment = '',
+  warning=FALSE,
+  message = FALSE
+)
+```
+
+
+A food court is a collection of food vendors, typically found in shopping malls, airports, and other high-traffic locations. These vendors offer a variety of food options, including fast food, ethnic cuisine, and specialty items such as desserts and beverages. Food courts are designed to provide customers with a convenient and efficient way to grab a quick meal or snack while on the go. They often feature a seating area for customers to enjoy their food and may also have amenities such as free Wi-Fi and charging stations.
+
+The question now lies in, what configuration is more efficient?
+  
+  ## Choping
+  
+  To chope is to book a table or queue for a table to be available. This behaviour is typically borne of a forward thinking consumer who wishes to secure the future of their dining experience. Additionally, this behaviour is typically expectandly borne out of prior experience in having had to wait laborious hours for tables in one's lifetime.
+
+## Not choping
+
+The bolder approach to one's dining experience.  This is characterized by one queueing for food directly, prioritizing acquisition over reconciliation.
+
+
+
+## Efficiency
+
+Efficiency in a food court setting, can be interpreted in a number of ways. We
+decided to categorise them based off of 
+
+```{r fig.showtext=TRUE, echo=FALSE, messages=FALSE, warning=FALSE}
+plot.new()
+# polygon (c(0, 0.1, 0.5, 0.5, 0.1), c(0.4, 0.5, 0.5, 0.3, 0.3), col="cyan")
+library(plotrix)
+draw.circle(0.5,0.5,0.2,col="cyan", lty = 4)
+# text()
+```
+
+Hints to the potentially crucial recordable metrics in this operation were hinted 
+by the illustrated scenario. These metrics included but were not limited to:
+  
+  
+  <!-- * Metrics -->
+  <!--       + Cooking Time -->
+  <!--           -Normally distributed -->
+  <!--           -Parameters depend on each stall -->
+  <!--       + Eating Time -->
+  <!--           -Normall distributed -->
+  <!--           -Parameters depends on each stall -->
+  <!--       +Popularity -->
+  <!--           -Multinomial -->
+  
+  
+  ### Gaussian variables
+  
+  
+  
+  * FoodCourt Metrics
++ Cooking Time
+- Normally distributed
+- Stall dependent
++ Eating Time
+- Normally distributed
+- Stall dependent
+
+### Stall choices
+
+Choice of stall is determined by a fixed "market share" concept. In other words, 
+the choice of stall is akin to a multinomial distribution.
+
+
+
+
+
+
+
+
+
+
+
+
+## Conditions {.tabset .tabset-pills}
+
+Simulation created depicting this scenario runs on a set of conditions. Some 
+are inferred or modified versions of the ones demonstrated in the scenario.
+
+
+### Eating Time
+
+```{r}
+library(ggplot2)
+# sliderInput("bins", "Bin width", 1, min = 0.5, max = 20)
+# sliderInput("N", "Simulation Size:", 700, min = 500, max = 3000)
+N<-15000
+df<-data.frame(
+  stall = factor(rep(c("Stall 1", "Stall 2", "Stall 3","Stall 4","Stall 5"),each=N),
+  ),
+  Time = round(c(rnorm(N,18,2),rnorm(N,20,2.5),rnorm(N,16,2),rnorm(N,23,3),rnorm(N,17,1.5)))
+)
+ggplot(df, aes(x=Time, col=stall)) +
+  geom_histogram(fill = "#202123", binwidth = 0.85,alpha=1.0, position="identity")
+```
+
+
+For each stall, the time taken by the customers to eat their food is generated 
+from a Normal distribution 
+
+### Diagram
+
+```{r, echo = FALSE}
+
+DiagrammeR::grViz("
+  digraph graph2 {
+  graph [layout = dot, rankdir = LR]
+  # node definitions with substituted label text
+  node [shape = oval]
+  a [label = '@@1']
+  b [label = '@@2']
+  c [label = '@@3']
+  d [label = '@@4']
+  a -> b -> c -> d
+  }
+  [1]: names(iris)[1]
+  [2]: names(iris)[2]
+  [3]: names(iris)[3]
+  [4]: names(iris)[4]
+  ", 
+                  height = 100)
+```
+
+### lattice
+
+```{r}
+lattice::show.settings()
+```
+
+### base
+
+```{r}
+plot(pressure, col = thematic::thematic_get_option("accent"))
+```

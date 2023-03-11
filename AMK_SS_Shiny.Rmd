@@ -1,0 +1,932 @@
+---
+title: "FoodCourt | AMK SS"
+output: 
+  html_document:
+    theme:
+      bg: "#FFF6EB"
+      fg: "#402E32"
+      primary: "#FFAD76"
+      secondary: "#00DAC6"
+      base_font:
+        Yu Gothic
+      heading_font:
+        optimamodoki
+    includes:
+      before_body: header.html
+      after_body: footer.html
+runtime: shiny
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+
+```{r setup, include=FALSE}
+library(pracma)
+library(comprehenr)
+knitr::opts_chunk$set(echo = TRUE)
+if (requireNamespace("thematic")) 
+  thematic::thematic_rmd(font = "auto")
+```
+
+A food court is a collection of food vendors, typically found in
+shopping malls, airports, and other high-traffic locations. These
+vendors offer a variety of food options, including fast food, ethnic
+cuisine, and specialty items such as desserts and beverages. Food courts
+are designed to provide customers with a convenient and efficient way to
+grab a quick meal or snack while on the go. They often feature a seating
+area for customers to enjoy their food and may also have amenities such
+as free Wi-Fi and charging stations.
+
+The question now lies in, what configuration is more efficient?
+
+---
+
+## Choping
+
+To chope is to book a table or queue for a table to be available. This
+behaviour is typically borne of a forward thinking consumer who wishes
+to secure the future of their dining experience. Additionally, this
+behaviour is typically expectandly borne out of prior experience in
+having had to wait laborious hours for tables in one's lifetime.
+
+---
+
+## Not choping
+
+The bolder approach to one's dining experience. This is characterized by
+one queueing for food directly, prioritizing acquisition over
+reconciliation.
+
+---
+
+## Efficiency {.tabset .tabset-pills .tabset-fade}
+
+Efficiency in a food court setting, can be interpreted in a number of
+ways. We decided to categorise them based off of.
+
+<!-- ```{r echo=FALSE, messages=FALSE, warning=FALSE, output=FALSE} -->
+
+<!-- plot.new() -->
+
+<!-- # polygon (c(0, 0.1, 0.5, 0.5, 0.1), c(0.4, 0.5, 0.5, 0.3, 0.3), col="cyan") -->
+
+<!-- library(dplyr) -->
+
+<!-- library(ggplot2) -->
+
+<!-- library(plotrix) -->
+
+<!-- library(showtext) -->
+
+<!-- library(rextendr) -->
+
+<!-- library(comprehenr) -->
+
+<!-- library(reactablefmtr) -->
+
+<!-- draw.circle(0.5,0.5,0.2,col="cyan", lty = 4) -->
+
+<!-- # text() -->
+
+<!-- ``` -->
+
+### Primary Factors
+
+::: row
+::: col-md-6
+#### Number of Sales
+:::
+
+::: col-md-6
+#### Time Spent
+:::
+:::
+
+---
+
+### Secondary Factors
+
+After Peak Hour Measurements
+
+In other words, these are factors recorded as a measure of the remaining
+situation, after the peak hour service time has ended.
+
+::: row
+::: col-md-6
+#### Number of Remaining Customers
+:::
+
+::: col-md-6
+#### Number of Customers waiting for tables
+:::
+:::
+
+---
+
+## Assumptions
+
+::: row
+::: col-md-4
+### Stall eating times
+
+<br><br>Stall eating times have been stated to be of a Normal
+distribution, with given means and standard deviations respectively.
+
+**The Gaussian distribution does not strictly adhere to a positive range
+of values and is prone to generating negative numbers. As such, when
+negative numbers were generated in the simulation, the function was
+rerun until a positive number was derived.**
+:::
+
+::: col-md-4
+### Customer influx
+
+<br><br>A plot was provided showing a distribution of customer group
+sizes over the week.
+
+**Instead of using the static, provided values to randomly take from, a
+rate to generate customers from a Poisson distribution was determined**.
+:::
+
+::: col-md-4
+### Queue space
+
+<br><br>According to the data collector, only 12 people are able to fit
+comfortably into the standing space in the shop - **after having allowed
+for space for queues**.
+
+**We assume that queues allow for infinite space for customers since
+this is not elaborated on**.
+:::
+:::
+
+::: row
+::: col-md-4
+### Customer Group atomicity
+
+<br><br>Customer groups do not break up.
+
+**Hence, customer groups in the waiting list will wait until the table
+accomodates for their group size, and only begin the eating timer when
+this condition has been fulfilled.**
+:::
+
+::: col-md-4
+### Crowding deterrance rules
+
+<br><br>When crowded, newcomers in groups tend to leave without
+waiting - if they are not choping.
+
+Any waiting person with food, waits indefinitely for food.
+
+**At full capacity, no new customers in group sizes above 2 will enter
+the coffeeshop if they are not choping. If they are choping, they will
+wait 10minutes**.
+
+**Chopers will NOT cut people who have been waiting earlier for tables -
+even if the earlier group's size precludes them from occupying the
+available tables and the newcomers' doesn't**.
+:::
+
+::: col-md-4
+### Takeaway
+
+<br><br><br>30% of takeaways ordered multiple portions of food.
+
+**We strictly apply a multinomial distribution where there is a 20%
+chance of the patron to purchase 2 portions, 10% for 4, and 70% for 1.
+This only applies for takeaway patrons**.
+
+All other patrons are assumed to only ever purchase 1 portion (per
+customer, not Customer group). This consideration is of course, not
+overriding the fact that some patrons may be ordering on behalf of other
+customers in their Customer group.
+:::
+:::
+
+Hints to the potentially crucial recordable metrics in this operation
+were hinted by the illustrated scenario. These metrics included but were
+not limited to:
+
+<br><br><br><br><br><br>
+
+<!-- * Metrics -->
+
+<!--       + Cooking Time -->
+
+<!--           -Normally distributed -->
+
+<!--           -Parameters depend on each stall -->
+
+<!--       + Eating Time -->
+
+<!--           -Normall distributed -->
+
+<!--           -Parameters depends on each stall -->
+
+<!--       +Popularity -->
+
+<!--           -Multinomial -->
+
+## Key Variables {.tabset .tabset-pills .tabset-fade}
+
+Variables are required to depict each of the primary agents in this
+simulation.
+
+### Customer
+
+Represents each customer GROUP (Customer) in the foodcourt. We can call
+this conceptualization, a "struct".
+
+Customers that have committed to eating at the foodcourt are designated
+a space in a Customer Vector, which is regularly updated in the time
+loop.
+
+::: row
+::: col-md-4
+#### Group Size
+
+<br><br>
+
+Number of customers, making up the group.
+
+In the simulation, this is not entirely accurate. We do set values 1-8
+to represent the number of customers directly, but we also incorporate
+the number '0' to indicate customers that are only there for takeaway.
+:::
+
+::: col-md-4
+#### Chope
+
+<br><br><br>A boolean that denotes the customer's behaviour: to chope or not
+to chope.
+:::
+
+::: col-md-4
+#### Queued
+
+<br><br>
+
+A boolean that denotes if the customer has COMPLETED queueing. It is
+important that this boolean does not update from its default FALSE state
+UNTIL the customer has already finished queueing
+:::
+:::
+
+::: row
+::: col-md-4
+#### Eaten
+
+<br><br><br>
+
+Similar boolean, to denote if customer has eaten or not.
+:::
+
+::: col-md-4
+#### Current \| Time {.tabset .tabset-pills .tabset-fade}
+
+
+##### Info
+
+This is a u32 variable that is regularly deducted in each iteration
+(whereby each iteration represents time). If this reaches 0, and other
+special circumstances are not a priority, the Customer's status is
+typically updated to the succeeding activity.
+
+##### Example
+
+For example, having queued = FALSE to queued = TRUE, followed by calling
+a function for the Customer to allocate their eating time (that is
+rolled for at the inception of the Customer object being created) to the
+Current variable and to be counted down from. This situation would only
+be for a 'chope' Customer, since a Customer who was not choping would
+have to now wait for a table first. More importantly, this would also
+only apply for Customer that ARE NOT of group-size 0, in other words,
+takeaway customers.
+
+##### Additional note
+
+Note that the non-choping customer's "waiting for table" time, is NOT
+constant with time itself, whereas the eating time of every Customer is
+independent of time. You COULD conceivably call for a customer to
+specifically roll for their eating time WHEN they are at a table,
+however, in this simulation, we assume that eating time is not affected
+by other Customers (only customers within the group since we have to
+take the maximum eating time of the group).
+:::
+
+::: col-md-4
+#### Choice of Stall
+
+<br><br><br>
+
+Stalls chosen by each customer. This is an array of values stored and
+generated from to calculate, the Eating time, as well as tabulate the
+queueing time later on when relevant to the customer.
+:::
+
+::: col-md-4
+#### Time spent
+
+<br><br><br>
+
+This is the total time the Customer has spent in the court, and is
+purely there for metric purposes.
+:::
+:::
+
+### Tables
+
+#### Table array
+
+A fixed array of 48 spaces. Initialized with values of 0, to represent
+unoccupied seats and they are updated with the occupying Customer's
+eating time. Interested Customers do not occupy the table unless 2
+conditions are fulfilled.
+
+Firstly, the Waiting List for the Tables have to be empty.
+
+Secondly, the tables have to have enough space for ALL the customers in
+the group to occupy.
+
+Simple array in construction.
+
+#### Waiting list
+
+This is the other "struct" (complicated variable) aside from Customer.
+There are a number of defining features that explain this.
+
+In fact, it is not even a struct, but a Vector of structs! The length of
+the waiting list is never constant and changes based off of the
+situation.
+
+::: row
+::: col-md-6
+##### Group Size
+
+This is the group-size of the Customer that is waiting in line. Copied
+from the Customer occupying it.
+:::
+
+::: col-md-6
+##### Eating Time
+
+Eating time for the Customer in this slot
+:::
+
+::: col-md-6
+##### Waiting Time
+
+The waiting time for a Customer in this slot is either calculated by
+comparing the Table array and calculating the wait time for enough
+spaces to be available, OR from the "Future Table" configuration of the
+predecessing Customer in the Waiting List.
+
+The former happens if the Customer is the first and only one in the
+Waiting List, and the latter occurs in all other scenarios.
+:::
+
+::: col-md-6
+##### Future Table
+
+The configuration of the Table array when the Customer group moves in to
+finally occupy space in the Table array and eat.
+:::
+:::
+
+### Queue times
+
+Array of 5, recording the queue times of the 5 stalls.
+
+## Conditions {.tabset .tabset-pills .tabset-fade}
+
+Simulation created depicting this scenario runs on a set of conditions.
+Some are inferred or modified versions of the ones demonstrated in the
+scenario.
+
+### Eating Time
+
+Choice of stall is determined by a fixed "market share" concept. In
+other words, the choice of stall is akin to a multinomial distribution.
+
+```{r Stalls, echo=FALSE}
+library(ggplot2)
+inputPanel(
+  
+  sliderInput("bins", "Bin width", 1, min = 0.05, max = 20),
+  
+  sliderInput("N", "Simulation Size:", 700, min = 500, max = 30000)
+  
+)
+
+renderPlot({
+  N<-input$N
+  df<-data.frame(
+    stall = factor(rep(c("Stall 1", "Stall 2", "Stall 3","Stall 4","Stall 5"),each=N),
+             ),
+    Time = round(c(rnorm(N,18,2),rnorm(N,20,2.5),rnorm(N,16,2),rnorm(N,23,3),rnorm(N,17,1.5)))
+  )
+  ggplot(df, aes(x=Time, col=stall, fill=stall)) +
+    geom_histogram( binwidth = input$bins,alpha=1.0, position="identity")
+})
+```
+
+```{r Alternative_visualisation, echo=FALSE, include=FALSE}
+inputPanel(
+
+  sliderInput("no", "Number of Orders:", 700, min = 500, max = 30000)
+  
+)
+
+
+renderUI({
+  NO<-input$no
+  print(typeof(NO))
+  df<-data.frame(
+    stall = factor(rep(c("Stall 1", "Stall 2", "Stall 3","Stall 4","Stall 5"),each=NO),
+    ),
+    Time = round(c(rnorm(NO,18,2),rnorm(NO,20,2.5),rnorm(NO,16,2),rnorm(NO,23,3),rnorm(NO,17,1.5)))
+  )  
+  
+  df %>%
+    group_by(stall) %>%
+    summarize(across(where(is.numeric), mean, na.rm = TRUE)) %>%
+    select(c(stall,Time)) %>%
+    reactable(
+      defaultColDef = colDef(
+        align = 'center',
+        cell = bubble_grid(
+          data = .,
+          number_fmt = scales::comma
+        )
+      )
+    )
+
+})
+  
+```
+
+<br><br><br><br><br><br><br><br><br><br><br><br>
+
+### Customer Influx
+
+#### Customer Influx as a Poisson Process
+
+A data collector's account for the influx of customers from respective
+customer group size allocations presented composition data for a week
+between 12pm to 2pm. Corresponding group sizes were 1 - 8, and aside
+from those that wanted to dine in, there were also individuals that
+simply came into the shop for takeout/takeaway.
+
+The composition of the customer base was noted. Similarly, the total
+number of customers that entered for the week per day, was noted.
+However, in the case of the simulation, a fixed number of customers was
+not set at the beginning to enter the shop and so forth. Instead, what
+was done was an emulation of 2 homogeneous Poisson process - one for
+each section of the peak hour (2/3 of the customers entering between the
+60min period between 1215 and 1315, and the remaining 1/3 in the final
+45min until 1400).
+
+```{r Influx, echo=FALSE}
+library(ggplot2)
+inputPanel(
+  
+  sliderInput("Poissonbins", "Bin width", 0.45, min = 0.05, max = 1),
+  
+  sliderInput("rate", "Rate:", 2.8, min = 2.3, max = 3.0,step = 0.005)
+  
+)
+
+renderPlot({
+  N<-input$rate
+  df<-data.frame(
+    PeriodPacket = factor(rep(c("Period 1","Period 2"),times=c(60,45)),
+    ),
+    Customers = round(c(rpois(60,N),rpois(45,N*2/3)))
+  )
+  ggplot(df, aes(x=Customers, col=PeriodPacket, fill = PeriodPacket)) +
+    geom_histogram( binwidth = input$Poissonbins,alpha=1.0, position="identity")
+})
+renderText({
+  "Total number of customers generated is"
+})
+renderText({
+  sum(rpois(60,input$rate)) + sum(rpois(45,input$rate*2/3))
+})
+```
+
+So consider the hard data...
+
+On Monday, 248 customers came in. On Tuesday, that was 206, and so on
+and so forth. The Poisson process, with the appropriate rate, can be
+used to approximately simulate a process whereby customers enter the
+foodcourt such that the total number of customers who visited the shop,
+is similar to that which was observed.
+
+As stated in the data collection report, it was not entirely clear if
+all customers who wanted to come in, truly were able to come in, and
+purchase their desired products. There was an understanding that
+generally all customers that had entered the food court, were able to
+eventually get their food. In other words, there is no clear metric for
+the customers who were discouraged from entering the food court due to
+issues such as crowding.
+
+To simplify the process, a rate of 2.8 was estimated to be roughly
+appropriate for this simulation. However, in the code, we are simulating
+Customer GROUPS, as a Poisson process, NOT individual customers. So
+while this rate is not technically wrong, in the code, we are required
+to determine a Poisson rate for a Poisson AND a multinomial case,
+whereby there are 9 possible categories - [takeaway,1,2...,8].
+
+<br><br><br><br><br><br><br><br><br><br><br><br>
+
+### Customer Group Influx
+
+#### Customer Influx as a Poisson Process + Multinomial attributes
+
+The prior consideration is not an accurate representation of how the
+code works.
+
+Every iterative loop in this prospective simulation, represents a minute
+in time. Within each minute, there is a chance of a Customer seed, being
+spawned, for which we are relying on a Poisson parameter for the
+appropriate rate. However, each Customer seed represents a group of
+customers. This group could represent 1,2,to 8 people in a group. The
+probabilities for the group size being that of which follows a
+multinomial distribution - by design.
+
+The following below is a reconfiguration of we need to determine as an
+input for the simulation. Let us consider the following adjustment.
+
+#### Multinomial consideration {.tabset .tabset-pills .tabset-fade}
+
+Below are simple Poisson generator configurations based off of an
+abridged version of the multinomial distribution of customer groups that
+came in according to the data collector's report on Monday. All values
+of 0 were changed to 1.
+
+This multinomial distribution is set as - (28,26,46,18,5,1,1,1,2).
+
+Take note that this simulation above DOES account for the fact that
+there is a second period that has 2/3 the Poisson rate for 45minutes
+(thus yielding 1/2 of the outputted customers on average, all other
+factors considered equal).
+
+##### Sampling some rates
+
+Taking the Monday's multinomial distribution as an example, we can pass
+it to R's rmultinom function to roll for each of these group sizes for
+every Customer seed/group that is generated.
+
+```{r adjustment}
+real<- function(cust_group_no){
+  if (cust_group_no==0){
+    return(0)
+  }
+  summie <- 0
+  for (i in 1:cust_group_no){
+    cv<-rmultinom(1,1,c(28,26,46,18,5,1,1,1,2))
+    cvlist<-to_vec(for(i in 3:9) cv[i]*(i-1))
+    summie<-summie+sum(cv[1:2],cvlist)
+  }
+  return(summie)
+}
+
+```
+
+We then generate Customer seeds at Poisson rates again like before, but
+the total number of customers to calculate is now done with an
+additional Multinomial calculation. This calculation is done for every
+Customer seed - which in turn follows that Poisson process.
+
+```{r ,echo=FALSE}
+inputPanel(
+  
+  sliderInput("Poissonbins_", "Bin width", 1, min = 0.05, max = 1),
+  
+  sliderInput("rate_", "Rate:", 0.5, min = 0.1, max = 3.0,step = 0.005)
+  
+)
+
+renderPlot({
+  N<-input$rate_
+  df<-data.frame(
+    PeriodPacket = factor(rep(c("Period 1","Period 2"),times=c(60,45)),
+    ),
+    Customers = round(c(rpois(60,N),rpois(45,N*2/3)))
+  )
+  df$cust<-as.numeric(lapply(df$Customers,real))
+  ggplot(df, aes(x=cust, col=PeriodPacket, fill = PeriodPacket)) +
+    geom_histogram(binwidth = input$Poissonbins_,alpha=1.0, position="identity")
+})
+renderText({
+  "Total number of customers generated is"
+})
+renderText({
+  N<-input$rate_
+  df_t<-data.frame(
+    PeriodPacket = factor(rep(c("Period 1","Period 2"),times=c(60,45)),
+    ),
+    Customers = round(c(rpois(60,N),rpois(45,N*2/3)))
+  )
+  df_t$cust<-as.numeric(lapply(df_t$Customers,real))  
+  sum(df_t$cust)
+})
+```
+
+As we can see, the appropriate rate changes drastically!
+
+##### $\lambda$ $\approx$ 1.1
+
+```{r lambda1 ,echo=FALSE}
+inputPanel(
+  
+  sliderInput("Poissonbins__", "Bin width", 0.5, min = 0.05, max = 1),
+  
+  sliderInput("rate__", "Rate:", 1.05, min = 1.05, max = 1.15,step = 0.005)
+  
+)
+
+renderPlot({
+  N<-input$rate__
+  df<-data.frame(
+    PeriodPacket = factor(rep(c("Period 1","Period 2"),times=c(60,45)),
+    ),
+    Customers = round(c(rpois(60,N),rpois(45,N*2/3)))
+  )
+  df$cust<-as.numeric(lapply(df$Customers,real))
+  ggplot(df, aes(x=cust, col=PeriodPacket, fill = PeriodPacket)) +
+    geom_histogram( binwidth = input$Poissonbins__,alpha=1.0, position="identity")
+})
+renderText({
+  "Total number of customers generated is"
+})
+renderText({
+  N<-input$rate__
+  df_t<-data.frame(
+    PeriodPacket = factor(rep(c("Period 1","Period 2"),times=c(60,45)),
+    ),
+    Customers = round(c(rpois(60,N),rpois(45,N*2/3)))
+  )
+  df_t$cust<-as.numeric(lapply(df_t$Customers,real))  
+  sum(df_t$cust)
+})
+```
+
+<br><br><br><br><br><br><br><br><br><br><br><br>
+
+##### $\lambda$ $\approx$ 1.2
+
+```{r lambda2 ,echo=FALSE}
+inputPanel(
+  
+  sliderInput("Poissonbins___", "Bin width", 0.5, min = 0.05, max = 1),
+  
+  sliderInput("rate___", "Rate:", 1.15, min = 1.15, max = 1.25,step = 0.005)
+  
+)
+
+renderPlot({
+  N<-input$rate___
+  df<-data.frame(
+    PeriodPacket = factor(rep(c("Period 1","Period 2"),times=c(60,45)),
+    ),
+    Customers = round(c(rpois(60,N),rpois(45,N*2/3)))
+  )
+  df$cust<-as.numeric(lapply(df$Customers,real))
+  ggplot(df, aes(x=cust, col=PeriodPacket, fill=PeriodPacket)) +
+    geom_histogram( binwidth = input$Poissonbins___,alpha=1.0, position="identity")
+})
+renderText({
+  "Total number of customers generated is"
+})
+renderText({
+  N<-input$rate___
+  df_t<-data.frame(
+    PeriodPacket = factor(rep(c("Period 1","Period 2"),times=c(60,45)),
+    ),
+    Customers = round(c(rpois(60,N),rpois(45,N*2/3)))
+  )
+  df_t$cust<-as.numeric(lapply(df_t$Customers,real))  
+  sum(df_t$cust)
+})
+```
+
+<br><br><br><br><br><br><br><br><br><br><br><br>
+
+### Space
+
+After allowing for queues in the shop, only 12 people are able to fit
+comfortably in the shop. This is presumed to indicate 2 things.
+
+Firstly, there is an infinite possible length for queues if the
+situation called for it. This is an unrealistic assumption, yet given
+the circumstances is a consideration we are going to go forward with in
+our simulation.
+
+Secondly, that there can be more than 12 people waiting inside the shop
+for tables, but this puts the shop in a state of overcrowding, which
+immediately disqualifies the shop from serving any new potential
+incoming customers who are not adopting the chope methodology, UNLESS
+these patrons are alone (take-away or dine in as 1).
+
+<br><br><br><br><br><br><br><br><br><br><br><br>
+
+### Seriality \| Order of Operations
+
+There are 2 types of Customers that we are generating, and their order
+of operations are different.
+
+A choper, hunts for a table first, queues up, eats and then leaves.
+
+A non-choper, queues, waits for a table indefinitely, eats and leaves.
+
+These processes are assuming that they have already invested interested
+in entering the food court and decided to purchase from the foodcourt.
+
+This sequence of events is governed by 2 things: **time** and **status -
+what have they done so far**.
+
+<br><br><br><br><br><br><br><br><br><br><br><br>
+
+
+## Results {.tabset .tabset-pills .tabset-fade}
+
+Simulations of these scenarios were repeated a number of times
+consecutively, and the indicative results were plotted as distributions.
+
+Time distribution is referring to the total time spent by each customer
+in the court.
+
+Sales refers to the total number of orders fulfilled by the end of each
+simulation.
+
+Patrons refers to the total number of customers that invested their time
+into the foodcourt and entered with the purpose of dining in or
+purhchasing food from there.
+
+Remaining Customers refers to the number of customers that remained in
+the food court by the end of the peak hour.
+
+Waiting for table refers to the number of customers in the food court
+who were waiting for a table by the end of the peak hour.
+
+### 100 000 iterations {.tabset .tabset-pills .tabset-fade}
+
+#### Time Spent
+
+```{r echo=FALSE, out.width = "30%", fig.align = "center",out.width = "900px"}
+knitr::include_graphics(path = "1/CoffeeShopSimulationResults/100000a/TimeDistribution.png")
+```
+
+#### Sales
+
+```{r echo=FALSE, out.width = "30%", fig.align = "center",out.width = "900px"}
+knitr::include_graphics(path = "1/CoffeeShopSimulationResults/100000a/Sales.png")
+```
+
+#### Patrons
+
+```{r echo=FALSE, out.width = "30%", fig.align = "center",out.width = "900px"}
+knitr::include_graphics(path = "1/CoffeeShopSimulationResults/100000a/Patrons.png")
+```
+
+#### Remaining Customers
+
+```{r echo=FALSE, out.width = "30%", fig.align = "center",out.width = "900px"}
+knitr::include_graphics(path = "1/CoffeeShopSimulationResults/100000a/Remaining_Customers.png")
+```
+
+#### Waiting for Table
+
+```{r echo=FALSE, out.width = "30%", fig.align = "center",out.width = "900px"}
+knitr::include_graphics(path = "1/CoffeeShopSimulationResults/100000a/Waittable_atend.png")
+```
+
+###  {.tabset .tabset-pills .tabset-fade}
+
+### 10 000\* iterations {.tabset .tabset-pills .tabset-fade}
+
+#### Time Spent
+
+```{r echo=FALSE, out.width = "30%", fig.align = "center",out.width = "900px"}
+knitr::include_graphics(path = "1/CoffeeShopSimulationResults/10000/TimeDistribution.png")
+```
+
+#### Sales
+
+```{r echo=FALSE, out.width = "30%", fig.align = "center",out.width = "900px"}
+knitr::include_graphics(path = "1/CoffeeShopSimulationResults/10000/Sales.png")
+```
+
+#### Patrons
+
+```{r echo=FALSE, out.width = "30%", fig.align = "center",out.width = "900px"}
+knitr::include_graphics(path = "1/CoffeeShopSimulationResults/10000/Patrons.png")
+```
+
+#### Remaining Customers
+
+```{r echo=FALSE, out.width = "30%", fig.align = "center",out.width = "900px"}
+knitr::include_graphics(path = "1/CoffeeShopSimulationResults/10000/Remaining_Customers.png")
+```
+
+#### Waiting for Table
+
+```{r echo=FALSE, out.width = "30%", fig.align = "center",out.width = "900px"}
+knitr::include_graphics(path = "1/CoffeeShopSimulationResults/10000/Waittable_atend.png")
+```
+
+### 500 000\* iterations {.tabset .tabset-pills .tabset-fade}
+
+#### Time Spent
+
+```{r echo=FALSE, out.width = "30%", fig.align = "center",out.width = "900px"}
+knitr::include_graphics(path = "1/CoffeeShopSimulationResults/500000/TimeDistribution.png")
+```
+
+#### Sales
+
+```{r echo=FALSE, out.width = "30%", fig.align = "center",out.width = "900px"}
+knitr::include_graphics(path = "1/CoffeeShopSimulationResults/500000/Sales.png")
+```
+
+#### Patrons
+
+```{r echo=FALSE, out.width = "30%", fig.align = "center",out.width = "900px"}
+knitr::include_graphics(path = "1/CoffeeShopSimulationResults/500000/Patrons.png")
+```
+
+#### Remaining Customers
+
+```{r echo=FALSE, out.width = "30%", fig.align = "center",out.width = "900px"}
+knitr::include_graphics(path = "1/CoffeeShopSimulationResults/500000/Remaining_Customers.png")
+```
+
+#### Waiting for Table
+
+```{r echo=FALSE, out.width = "30%", fig.align = "center",out.width = "900px"}
+knitr::include_graphics(path = "1/CoffeeShopSimulationResults/500000/Waittable_atend.png")
+```
+
+### 1 000 000\* iterations {.tabset .tabset-pills .tabset-fade}
+
+#### Sales
+
+```{r echo=FALSE, out.width = "30%", fig.align = "center",out.width = "900px"}
+knitr::include_graphics(path = "1/CoffeeShopSimulationResults/1mil/Sales.png")
+```
+
+#### Patrons
+
+```{r echo=FALSE, out.width = "30%", fig.align = "center",out.width = "900px"}
+knitr::include_graphics(path = "1/CoffeeShopSimulationResults/1mil/Patrons.png")
+```
+
+#### Remaining Customers
+
+```{r echo=FALSE, out.width = "30%", fig.align = "center",out.width = "900px"}
+knitr::include_graphics(path = "1/CoffeeShopSimulationResults/1mil/Remaining_Customers.png")
+```
+
+#### Waiting for Table
+
+```{r echo=FALSE, out.width = "30%", fig.align = "center",out.width = "900px"}
+knitr::include_graphics(path = "1/CoffeeShopSimulationResults/1mil/Waittable_atend.png")
+```
+
+### 50 000 000\* iterations {.tabset .tabset-pills .tabset-fade}
+
+#### Sales
+
+```{r echo=FALSE, out.width = "30%", fig.align = "center",out.width = "900px"}
+knitr::include_graphics(path = "1/CoffeeShopSimulationResults/50mil/Sales.png")
+```
+
+#### Patrons
+
+```{r echo=FALSE, out.width = "30%", fig.align = "center",out.width = "900px"}
+knitr::include_graphics(path = "1/CoffeeShopSimulationResults/50mil/Patrons.png")
+```
+
+#### Remaining Customers
+
+```{r echo=FALSE, out.width = "30%", fig.align = "center",out.width = "900px"}
+knitr::include_graphics(path = "1/CoffeeShopSimulationResults/50mil/Remaining_Customers.png")
+```
+
+#### Waiting for Table
+
+```{r echo=FALSE, out.width = "30%", fig.align = "center",out.width = "900px"}
+knitr::include_graphics(path = "1/CoffeeShopSimulationResults/50mil/Waittable_atend.png")
+```
+
+## Remarks
+
+By every measurable metric, it is apparent, that choping is efficient
+from a business and social standpoint!
+
+The difference between the 2 methods, hinges on the customers that are visiting the foodcourt alone.  This is because for non-chopers, the solo individuals are not deterred by any sort of overcrowding, whereas that is not the case for choping individuals who have come to the foodcourt alone.  
+
+Combined with the fact that there is no length at which queues apparently deter customers from the foodcourt either, these, potentially unrealistic assumptions lead to the divergence between the 2 customer behaviours in this simulation.
